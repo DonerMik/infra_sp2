@@ -1,8 +1,8 @@
+from django.forms import ValidationError
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-
-from reviews.models import Category, User, Genre, Title, Review
+from reviews.models import Category, Comment, Genre, Review, Title, User
 
 
 class UserSignupSerializer(serializers.Serializer):
@@ -54,10 +54,11 @@ class TitleSerializer(serializers.ModelSerializer):
     description = serializers.CharField(required=False)
     genre = GenreSerializer(read_only=True, many=True)
     category = CategorySerializer(read_only=True)
+    rating = serializers.IntegerField()
 
     class Meta:
         model = Title
-        fields = ('id', 'name', 'year', 'description',
+        fields = ('id', 'name', 'year', 'rating', 'description',
                   'genre', 'category')
 
 
@@ -73,3 +74,40 @@ class TitleSerializerPostPatch(serializers.ModelSerializer):
         model = Title
         fields = ('id', 'name', 'year', 'description',
                   'genre', 'category')
+
+
+class ReviewSerializer(serializers.ModelSerializer):
+    author = serializers.SlugRelatedField(
+        read_only=True, slug_field='username'
+    )
+    title = serializers.SlugRelatedField(
+        read_only=True, slug_field='name'
+    )
+
+    class Meta:
+        model = Review
+        fields = ('id', 'title', 'text', 'author', 'score', 'pub_date')
+
+    def validate(self, attrs):
+        method = self.context.get('request').method
+        if method != 'POST':
+            return super().validate(attrs)
+
+        title_id = self.context.get('view').kwargs['title_id']
+        author = self.context.get('request').user
+        if Review.objects.filter(
+                author=author, title_id=title_id
+        ).exists():
+            raise ValidationError(
+                'Нельзя дважды написать отзыв на одно произведение')
+        return super().validate(attrs)
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    author = serializers.SlugRelatedField(
+        read_only=True, slug_field='username'
+    )
+
+    class Meta:
+        model = Comment
+        fields = ('id', 'text', 'author', 'pub_date')

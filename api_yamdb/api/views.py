@@ -1,24 +1,27 @@
 from django.contrib.auth.tokens import default_token_generator
-from django.shortcuts import get_object_or_404
 from django.core.mail import send_mail
 from django.db.models import Avg
-from rest_framework.decorators import api_view, action
-from rest_framework.response import Response
-from rest_framework import status, viewsets, filters
-from rest_framework_simplejwt.tokens import AccessToken
+from django.shortcuts import get_object_or_404
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters, status, viewsets
+from rest_framework.decorators import action, api_view
+from rest_framework.mixins import (CreateModelMixin, DestroyModelMixin,
+                                   ListModelMixin)
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
-from rest_framework.mixins import (ListModelMixin, CreateModelMixin,
-                                   DestroyModelMixin)
-from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import AccessToken
+from reviews.models import Category, Comment, Genre, Review, Title, User
 
 from api_yamdb import settings
-from .serializers import (UserSignupSerializer, TokenSerializer,
-                          UserSerializer, CategorySerializer, GenreSerializer,
-                          TitleSerializer, TitleSerializerPostPatch)
-from reviews.models import Category, Genre, User, Title
-from .permissions import IsAdmin, IsAdminOrReaOnly
+
 from .filter import TitleFilter
+from .permissions import AuthorOrModerOrReadOnly, IsAdmin, IsAdminOrReaOnly
+from .serializers import (CategorySerializer, CommentSerializer,
+                          GenreSerializer, ReviewSerializer, TitleSerializer,
+                          TitleSerializerPostPatch, TokenSerializer,
+                          UserSerializer, UserSignupSerializer)
+
 
 @api_view(['POST'])
 def get_confirmation_code(request):
@@ -75,31 +78,31 @@ class UserViewSet(viewsets.ModelViewSet):
         methods=['patch', 'get'],
         permission_classes=[IsAuthenticated],
         detail=False,
-     )
+    )
     def me(self, request):
         user = self.request.user
         serializer = self.get_serializer(user)
-        if self.request.method == 'PATCH':
-            if user.role == User.USER and not user.is_superuser:
-                role = request.data.dict().get('role', None)
-                if role is not None and role != 'user':
-                    _mutable = request.data._mutable
-                    request.data._mutable = True
-                    request.data['role'] = 'user'
-                    request.data._mutable = _mutable
-            serializer = self.get_serializer(
-                user,
-                data=request.data,
-                partial=True
-            )
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
+        if self.request.method != 'PATCH':
+            return Response(serializer.data)
+        if user.role == User.USER and not user.is_superuser:
+            role = request.data.dict().get('role', None)
+            if role is not None and role != 'user':
+                _mutable = request.data._mutable
+                request.data._mutable = True
+                request.data['role'] = 'user'
+                request.data._mutable = _mutable
+        serializer = self.get_serializer(
+            user,
+            data=request.data,
+            partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
         return Response(serializer.data)
 
 
 class CreateListDestroyViewSet(ListModelMixin, CreateModelMixin,
                                DestroyModelMixin, viewsets.GenericViewSet):
-
     pass
 
 
@@ -156,8 +159,55 @@ class TitlesViewSet(viewsets.ModelViewSet):
         return TitleSerializerPostPatch
 
 
+class ReviewViewSet(viewsets.ModelViewSet):
+    serializer_class = ReviewSerializer
+    permission_classes = (AuthorOrModerOrReadOnly,)
+    pagination_class = PageNumberPagination
+
+    def perform_create(self, serializer):
+        title_id = self.kwargs.get('title_id')
+        title = get_object_or_404(Title, id=title_id)
+        author = get_object_or_404(
+            User,
+            username=self.request.user
+        )
+        serializer.save(
+            author=author,
+            title=title
+        )
+
+    def perform_destroy(self, serializer):
+        super().perform_destroy(serializer)
+
+    def get_queryset(self):
+        title_id = self.kwargs.get('title_id')
+        title = get_object_or_404(Title, id=title_id)
+        return Review.objects.filter(title=title)
 
 
+class CommentViewSet(viewsets.ModelViewSet):
+    queryset = Comment.objects.all()
+    serializer_class = CommentSerializer
+    permission_classes = (AuthorOrModerOrReadOnly,)
+    pagination_class = PageNumberPagination
 
+    def perform_create(self, serializer):
+        title_id = self.kwargs.get('title_id')
+        get_object_or_404(Title, id=title_id)
+        review_id = self.kwargs.get('review_id')
+        review = get_object_or_404(Review, id=review_id)
+        author = self.request.user
+        serializer.save(
+            author=author,
+            review=review
+        )
 
+    def perform_destroy(self, serializer):
+        super().perform_destroy(serializer)
 
+    def get_queryset(self):
+        title_id = self.kwargs.get('title_id')
+        get_object_or_404(Title, id=title_id)
+        review_id = self.kwargs.get('review_id')
+        review = get_object_or_404(Review, id=review_id)
+        return review.comments.all()

@@ -4,7 +4,12 @@ REST API для сервиса YaMDb — базы отзывов о фильма
 
 Структура файла .env:
 
-DB_ENGINE - используемая база данных DB_NAME - название базы данных POSTGRES_USER - пользователь POSTGRES_PASSWORD - пароль DB_HOST - БД xост DB_PORT - БД порт
+DB_ENGINE - используемая база данных
+DB_NAME - название базы данных
+POSTGRES_USER - пользователь
+POSTGRES_PASSWORD - пароль
+DB_HOST - БД xост
+DB_PORT - БД порт
 
 НАСТРОЙКА ПРОЕКТА:
 
