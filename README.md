@@ -28,3 +28,6 @@ docker-compose exec web python manage.py migrate docker-compose exec web python 
 ПРОЕКТ ЗАПУЩЕН по адресу http://127.0.0.1:8000/redoс/
 
 Отключение сервиса : docker-compose down -v
+
+
+Автор: Микутайтис Денис. Почта: denismik92@gmail.com
