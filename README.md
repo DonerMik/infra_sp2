@@ -31,3 +31,4 @@ docker-compose exec web python manage.py migrate docker-compose exec web python 
 
 
 Автор: Микутайтис Денис. Почта: denismik92@gmail.com
+(https://github.com/DonerMik/infra_sp2/actions/workflows/yamdb_workflow/badge.svg)
